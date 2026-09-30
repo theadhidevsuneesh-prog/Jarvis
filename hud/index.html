@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>J.A.R.V.I.S.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050302; --panel: rgba(14, 9, 3, 0.74); --line: rgba(255, 176, 59, 0.24);
+    --cyan: #ffb03b; --cyan-dim: rgba(255, 176, 59, 0.62); --text: #fbe9cf; --muted: #a88c68;
+    --warn: #ffd166; --hot: #ff4d2e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: Rajdhani, "Segoe UI", sans-serif; overflow: hidden; }
+  #gl { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: repeating-linear-gradient(0deg, rgba(255,176,59,0.018) 0 1px, transparent 1px 4px),
+      radial-gradient(ellipse at 50% 40%, transparent 45%, rgba(0,0,0,.55) 100%); }
+
+  .layout { position: relative; z-index: 2; height: 100%; display: grid; grid-template-columns: 290px minmax(0, 1fr) 350px;
+    grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 10px 14px; padding: 12px 18px; }
+  header { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline;
+    font-family: Orbitron, sans-serif; letter-spacing: .3em; font-size: 11px; color: var(--cyan-dim); }
+  header .title { color: var(--cyan); font-size: 17px; text-shadow: 0 0 12px var(--cyan); }
+  header .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--hot); margin-right: 8px;
+    box-shadow: 0 0 8px var(--hot); vertical-align: middle; }
+  header .dot.ok { background: #7dff9a; box-shadow: 0 0 8px #7dff9a; }
+
+  .col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .panel { border: 1px solid var(--line); background: var(--panel); padding: 10px 13px; position: relative; min-height: 0;
+    backdrop-filter: blur(7px) saturate(1.1); -webkit-backdrop-filter: blur(7px);
+    clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+  .panel::after { content: ""; position: absolute; left: 0; top: 0; width: 26px; height: 2px; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .panel h3 { margin: 0 0 7px; font: 500 9.5px Orbitron, sans-serif; letter-spacing: .25em; color: var(--cyan-dim);
+    display: flex; justify-content: space-between; gap: 8px; }
+  .grow { flex: 1; display: flex; flex-direction: column; }
+  .clock { font: 700 38px Orbitron, sans-serif; color: var(--cyan); text-shadow: 0 0 18px rgba(255,176,59,.6); line-height: 1.05; }
+  .date { color: var(--muted); font-size: 14px; letter-spacing: .08em; }
+  .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 14.5px; padding: 1.5px 0;
+    border-bottom: 1px dashed rgba(255,176,59,.09); }
+  .kv span:first-child { color: var(--muted); white-space: nowrap; }
+  .kv span:last-child { text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar { height: 3px; background: rgba(255,176,59,.12); margin: 2px 0 5px; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--cyan); box-shadow: 0 0 8px var(--cyan); transition: width .6s; }
+  .hot { color: var(--hot) !important; } .warm { color: var(--warn) !important; }
+
+  .gauges { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .gauge { width: 30%; text-align: center; }
+  .gauge svg { width: 100%; aspect-ratio: 1; }
+  .gauge .v { font: 700 15px Orbitron, sans-serif; fill: var(--text); }
+  .gauge .l { font: 500 9px Orbitron, sans-serif; letter-spacing: .15em; color: var(--muted); margin-top: -3px; }
+  .gauge circle.track { stroke: rgba(255,176,59,.12); }
+  .gauge circle.val { stroke: var(--cyan); transition: stroke-dashoffset .8s, stroke .6s; filter: drop-shadow(0 0 4px var(--cyan)); }
+
+  .scroll { overflow-y: auto; flex: 1; min-height: 0; }
+  .scroll::-webkit-scrollbar { width: 3px; } .scroll::-webkit-scrollbar-thumb { background: var(--line); }
+  .task { display: flex; gap: 8px; align-items: flex-start; padding: 2px 0; cursor: pointer; font-size: 14.5px; }
+  .task .box { flex: none; width: 12px; height: 12px; margin-top: 3px; border: 1px solid var(--cyan); }
+  .task.done { color: var(--muted); text-decoration: line-through; }
+  .task.done .box { background: var(--cyan); box-shadow: 0 0 6px var(--cyan); }
+  .task .x { margin-left: auto; color: var(--muted); opacity: 0; padding: 0 4px; }
+  .task:hover .x { opacity: 1; } .task .x:hover { color: var(--hot); }
+  .addtask { width: 100%; margin-top: 5px; background: transparent; border: 0; border-bottom: 1px solid var(--line);
+    color: var(--text); font: 14.5px Rajdhani, sans-serif; padding: 3px 0; outline: 0; }
+
+  /* ---------- centre ---------- */
+  .center { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; min-height: 0; }
+  .stage { --size: min(40vh, 380px); position: relative; width: var(--size); aspect-ratio: 1; flex: none; cursor: pointer;
+    margin: calc(var(--size) * .1) 0 calc(var(--size) * .12); border-radius: 50%; }
+  .stage canvas { position: absolute; left: -22%; top: -22%; width: 144%; height: 144%; pointer-events: none; }
+  .reactor { position: absolute; inset: 0; cursor: pointer; }
+  .reactor svg { width: 100%; height: 100%; overflow: visible; }
+  .spin { transform-origin: 250px 250px; animation: spin var(--s, 30s) linear infinite; }
+  .rev { animation-direction: reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .core { transform-origin: 250px 250px; transform: scale(var(--lvl, 1)); transition: transform .08s linear; }
+  body.thinking .spin { animation-duration: calc(var(--s, 30s) / 7); }
+  .ring-listen { opacity: 0; transition: opacity .3s; }
+  body.listening .ring-listen { opacity: 1; }
+  .state { font: 500 12px Orbitron, sans-serif; letter-spacing: .45em; color: var(--cyan); text-shadow: 0 0 10px var(--cyan); }
+  #repos .item .meta { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+  .todo { min-height: 130px; }
+  body.listening .state { color: var(--hot); text-shadow: 0 0 10px var(--hot); }
+  .caption { text-shadow: 0 1px 3px #000, 0 0 12px #000; max-width: 760px; width: 100%; text-align: center; font-size: 19px; line-height: 1.28; min-height: 2.6em;
+    max-height: 3.9em; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; }
+  .caption span { display: block; }
+  .news { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; flex: 1; min-height: 0; }
+  .item { display: flex; gap: 8px; padding: 3.5px 0; border-bottom: 1px dashed rgba(255,176,59,.09); cursor: pointer;
+    font-size: 14.5px; line-height: 1.22; animation: fadein .5s both; }
+  .item:hover .t { color: #fff; text-shadow: 0 0 8px var(--cyan); }
+  .item .src { flex: none; font: 500 8.5px Orbitron, sans-serif; letter-spacing: .1em; color: var(--bg); background: var(--cyan-dim);
+    padding: 2px 4px; height: fit-content; margin-top: 2px; min-width: 30px; text-align: center; }
+  .item .meta { color: var(--muted); font-size: 12.5px; }
+  .item .t { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 5px; }
+  .chip { font: 500 8.5px Orbitron, sans-serif; letter-spacing: .08em; border: 1px solid var(--line); color: var(--cyan);
+    padding: 2px 6px; text-transform: uppercase; }
+  .tabs span { cursor: pointer; opacity: .5; } .tabs span.on { opacity: 1; color: var(--cyan); }
+
+  .log { display: flex; flex-direction: column; gap: 7px; padding-right: 6px; font-size: 14.5px; }
+  .msg { line-height: 1.28; white-space: pre-wrap; word-wrap: break-word; }
+  .msg b { display: block; font: 500 8.5px Orbitron, sans-serif; letter-spacing: .25em; margin-bottom: 1px; }
+  .msg.me b { color: var(--warn); } .msg.ai b { color: var(--cyan); } .msg.me { color: #ffe7b8; }
+
+  .ticker { background: rgba(8,5,2,.7); backdrop-filter: blur(6px); grid-column: 1 / -1; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    white-space: nowrap; font-size: 14px; color: var(--cyan-dim); padding: 4px 0; mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+  .ticker .track { display: inline-block; animation: tick var(--dur, 240s) linear infinite; }
+  .ticker:hover .track { animation-play-state: paused; }
+  .ticker b { color: var(--cyan); font: 500 9px Orbitron, sans-serif; letter-spacing: .15em; margin: 0 6px 0 26px; }
+  .ticker a { color: var(--text); text-decoration: none; cursor: pointer; } .ticker a:hover { color: #fff; }
+  @keyframes tick { to { transform: translateX(-50%); } }
+
+  footer { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; }
+  .input { flex: 1; display: flex; border: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(6px); }
+  .input input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font: 17px Rajdhani, sans-serif; padding: 9px 14px; }
+  button { backdrop-filter: blur(6px); font: 500 10.5px Orbitron, sans-serif; letter-spacing: .2em; color: var(--cyan); background: transparent;
+    border: 1px solid var(--line); padding: 10px 13px; cursor: pointer; }
+  button:hover { background: rgba(255,176,59,.1); box-shadow: 0 0 12px rgba(255,176,59,.3); }
+  button.on { background: rgba(255,176,59,.18); color: #fff; }
+  #mic.live { border-color: var(--hot); color: var(--hot); box-shadow: 0 0 14px rgba(255,90,54,.5); }
+
+  /* permission card */
+  .perm { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 10;
+    background: radial-gradient(circle, rgba(2,7,13,.55), rgba(2,7,13,.85)); backdrop-filter: blur(3px); }
+  .perm.show { display: flex; animation: fadein .25s both; }
+  .perm .card { width: min(620px, 92vw); border: 1px solid var(--warn); background: rgba(20, 14, 0, .85); padding: 22px 26px;
+    clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+    box-shadow: 0 0 40px rgba(255,179,0,.2); }
+  .perm.danger .card { border-color: var(--hot); background: rgba(30, 6, 0, .88); box-shadow: 0 0 50px rgba(255,90,54,.3); }
+  .perm h2 { margin: 0 0 4px; font: 700 13px Orbitron, sans-serif; letter-spacing: .35em; color: var(--warn); }
+  .perm.danger h2 { color: var(--hot); }
+  .perm .sum { font-size: 23px; margin: 6px 0 10px; color: #fff; }
+  .perm pre { margin: 0 0 14px; padding: 10px 12px; background: rgba(0,0,0,.45); border-left: 2px solid var(--warn);
+    font: 13px Consolas, monospace; color: #ffe7b8; white-space: pre-wrap; word-break: break-all; max-height: 150px; overflow: auto; }
+  .perm .hint { color: var(--muted); font-size: 14px; margin-bottom: 14px; }
+  .perm .row { display: flex; gap: 12px; }
+  .perm button { flex: 1; font-size: 12px; padding: 13px; }
+  .perm #p-allow { border-color: #3dffa8; color: #3dffa8; } .perm #p-deny { border-color: var(--hot); color: var(--hot); }
+
+  @media (max-width: 1100px) {
+    html, body { overflow: auto; }
+    .layout { grid-template-columns: 1fr; height: auto; min-height: 100%; }
+    .news { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div class="layout">
+  <header><span class="title">J.A.R.V.I.S.</span><span><span class="dot" id="brain-dot"></span><span id="sys">WARMING UP</span></span></header>
+
+  <!-- ================= left ================= -->
+  <aside class="col">
+    <div class="panel"><h3>LOCAL TIME</h3><div class="clock" id="clock">--:--</div><div class="date" id="date"></div></div>
+    <div class="panel"><h3>ENVIRONMENT</h3>
+      <div class="kv"><span>Location</span><span id="w-loc">—</span></div>
+      <div class="kv"><span>Conditions</span><span id="w-cond">—</span></div>
+      <div class="kv"><span>Temperature</span><span id="w-temp">—</span></div>
+      <div class="kv"><span>Humidity · Wind</span><span id="w-hw">—</span></div>
+    </div>
+    <div class="panel grow todo"><h3><span>TO-DO</span><span id="task-count"></span></h3>
+      <div class="scroll" id="tasks"></div>
+      <input class="addtask" id="addtask" placeholder="+ add a task and press Enter" autocomplete="off">
+    </div>
+    <div class="panel"><h3>GITHUB · RISING THIS WEEK</h3><div id="repos"></div></div>
+  </aside>
+
+  <!-- ================= centre ================= -->
+  <main class="center">
+    <div class="stage" id="reactor" title="Click to talk"></div>
+    <div class="state" id="state">STANDING BY</div>
+    <div class="caption" id="caption"><span>Clap twice, say “Jarvis” (or sweetheart, buddy…), hold <b>Space</b> or click the reactor.</span></div>
+    <div class="news">
+      <div class="panel grow"><h3><span>TRENDING · CODE &amp; ENGINEERING</span><span id="code-page"></span></h3>
+        <div class="chips" id="topics"></div><div class="scroll" id="code"></div></div>
+      <div class="panel grow"><h3><span>INDUSTRY WIRE · INTERNATIONAL</span><span id="wire-page"></span></h3>
+        <div class="scroll" id="wire"></div></div>
+    </div>
+  </main>
+
+  <!-- ================= right ================= -->
+  <aside class="col">
+    <div class="panel"><h3><span>SYSTEMS</span><span id="uptime"></span></h3>
+      <div class="gauges">
+        <div class="gauge"><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="40" fill="none" stroke-width="7"/>
+          <circle class="val" id="g-cpu" cx="50" cy="50" r="40" fill="none" stroke-width="7" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"/>
+          <text class="v" id="t-cpu" x="50" y="56" text-anchor="middle">–</text></svg><div class="l">CPU</div></div>
+        <div class="gauge"><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="40" fill="none" stroke-width="7"/>
+          <circle class="val" id="g-ram" cx="50" cy="50" r="40" fill="none" stroke-width="7" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"/>
+          <text class="v" id="t-ram" x="50" y="56" text-anchor="middle">–</text></svg><div class="l">RAM</div></div>
+        <div class="gauge"><svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="40" fill="none" stroke-width="7"/>
+          <circle class="val" id="g-gpu" cx="50" cy="50" r="40" fill="none" stroke-width="7" stroke-dasharray="251.3" stroke-dashoffset="251.3" transform="rotate(-90 50 50)"/>
+          <text class="v" id="t-gpu" x="50" y="56" text-anchor="middle">–</text></svg><div class="l">GPU</div></div>
+      </div>
+      <div class="kv"><span>GPU temp</span><span id="gpu-temp">—</span></div>
+      <div class="kv"><span>System sensor</span><span id="sys-temp">—</span></div>
+      <div class="kv"><span>CPU</span><span id="cpu-clock">—</span></div>
+      <div class="kv"><span>Memory</span><span id="ram">—</span></div>
+      <div class="kv"><span>VRAM · power</span><span id="vram">—</span></div>
+      <div class="kv"><span>Storage C:</span><span id="disk">—</span></div><div class="bar"><i id="disk-bar"></i></div>
+      <div class="kv"><span>Battery</span><span id="batt">—</span></div><div class="bar"><i id="batt-bar"></i></div>
+      <div class="kv"><span>Network</span><span id="net">—</span></div>
+      <div class="kv"><span>Heaviest apps</span><span id="top">—</span></div>
+    </div>
+    <div class="panel grow"><h3>COMMS LOG</h3><div class="scroll log" id="log"></div></div>
+  </aside>
+
+  <div class="ticker" id="ticker"><div class="track" id="ticker-track">Loading headlines…</div></div>
+
+  <footer>
+    <button id="mic" title="Talk (hold Space)">● TALK</button>
+    <div class="input"><input id="text" placeholder="Type a command for JARVIS and press Enter…" autocomplete="off"></div>
+    <button id="hands" class="on" title="After JARVIS answers, listen for a follow-up automatically">HANDS-FREE</button>
+    <button id="hush" title="Stop talking (Esc)">HUSH</button>
+    <button id="new" title="Start a fresh conversation">NEW</button>
+  </footer>
+</div>
+
+<div class="perm" id="perm"><div class="card">
+  <h2 id="p-title">PERMISSION REQUIRED</h2>
+  <div class="sum" id="p-sum"></div>
+  <pre id="p-detail"></pre>
+  <div class="hint" id="p-hint">Say “yes” or “no” — or use the buttons.</div>
+  <div class="row"><button id="p-allow">ALLOW</button><button id="p-deny">DENY</button></div>
+</div></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const open_ = url => url && window.open(url, "_blank");
+let busy = false, listening = false, serverSpeaking = false, handsFree = true, newNext = false, awaitingFollowUp = false;
+let wakeReason = "";
+
+// =============== clock, weather ===============
+function tick() {
+  const d = new Date();
+  $("clock").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  $("date").textContent = d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase();
+}
+setInterval(tick, 1000); tick();
+async function loadWeather() {
+  try {
+    const [loc, cond, temp, hum, wind] = ((await (await fetch("/weather")).json()).weather || "").split("|");
+    if (loc) { $("w-loc").textContent = loc.split(",")[0]; $("w-cond").textContent = cond;
+      $("w-temp").textContent = temp.replace("+", ""); $("w-hw").textContent = `${hum} · ${wind}`; }
+  } catch {}
+}
+loadWeather(); setInterval(loadWeather, 15 * 60 * 1000);
+
+// =============== system telemetry ===============
+const gb = b => (b / 2 ** 30).toFixed(b >= 100 * 2 ** 30 ? 0 : 1);
+const rate = b => b > 2 ** 20 ? (b / 2 ** 20).toFixed(1) + " MB/s" : Math.round(b / 1024) + " KB/s";
+function gauge(id, pct) {
+  const c = $("g-" + id); c.style.strokeDashoffset = 251.3 * (1 - Math.min(pct, 100) / 100);
+  c.style.stroke = pct > 90 ? "var(--hot)" : pct > 75 ? "var(--warn)" : "var(--cyan)";
+  $("t-" + id).textContent = Math.round(pct) + "%";
+}
+const tempCls = (el, t, warm, hot) => { el.classList.toggle("warm", t >= warm && t < hot); el.classList.toggle("hot", t >= hot); };
+async function loadSys() {
+  try {
+    const s = await (await fetch("/sysinfo")).json();
+    if (s.cpu == null) return;
+    gauge("cpu", s.cpu); gauge("ram", s.ram_pct); gauge("gpu", s.gpu_util ?? 0);
+    $("gpu-temp").textContent = s.gpu_temp != null ? `${s.gpu_temp}°C · ${s.gpu_name}` : "—"; tempCls($("gpu-temp"), s.gpu_temp ?? 0, 75, 87);
+    $("sys-temp").textContent = s.sys_temp != null ? `${s.sys_temp}°C` : "—"; tempCls($("sys-temp"), s.sys_temp ?? 0, 70, 85);
+    $("cpu-clock").textContent = `${s.cpu_ghz} GHz · ${s.cores} threads · ${s.procs} procs`;
+    $("ram").textContent = `${gb(s.ram_used)} / ${gb(s.ram_total)} GB`;
+    $("vram").textContent = s.vram_total ? `${(s.vram_used / 1024).toFixed(1)} / ${(s.vram_total / 1024).toFixed(0)} GB · ${s.gpu_watts ?? "–"} W` : "—";
+    $("disk").textContent = `${gb(s.disk_total - s.disk_used)} GB free of ${gb(s.disk_total)}`;
+    $("disk-bar").style.width = s.disk_pct + "%";
+    if (s.battery != null) {
+      const left = s.batt_secs ? ` · ${Math.floor(s.batt_secs / 3600)}h ${Math.round(s.batt_secs % 3600 / 60)}m left` : "";
+      $("batt").textContent = `${s.battery}%${s.plugged ? " ⚡ charging" : left}`;
+      $("batt-bar").style.width = s.battery + "%"; $("batt-bar").style.background = s.battery < 20 && !s.plugged ? "var(--hot)" : "";
+    }
+    $("net").textContent = `↓ ${rate(s.down)}  ↑ ${rate(s.up)}`;
+    $("top").textContent = s.top.map(p => `${p.name} ${p.mb >= 1024 ? (p.mb / 1024).toFixed(1) + "G" : p.mb + "M"}`).join(", ");
+    const m = Math.floor((Date.now() / 1000 - s.boot) / 60);
+    $("uptime").textContent = `UP ${Math.floor(m / 60)}H ${m % 60}M`;
+  } catch {}
+}
+loadSys(); setInterval(loadSys, 2000);
+
+// =============== to-do ===============
+function renderTasks(tasks) {
+  const box = $("tasks"); box.innerHTML = "";
+  $("task-count").textContent = `${tasks.filter(t => !t.done).length} OPEN`;
+  for (const t of [...tasks.filter(t => !t.done), ...tasks.filter(t => t.done)]) {
+    const row = document.createElement("div"); row.className = "task" + (t.done ? " done" : "");
+    row.innerHTML = `<span class="box"></span><span>${esc(t.text)}</span><span class="x" title="Delete">✕</span>`;
+    row.onclick = async e => renderTasks((await (await post("/tasks", { action: e.target.classList.contains("x") ? "delete" : "toggle", line: t.line })).json()).tasks);
+    box.append(row);
+  }
+  if (!tasks.length) box.innerHTML = '<div style="color:var(--muted)">Nothing on the list.</div>';
+}
+const loadTasks = async () => { try { renderTasks((await (await fetch("/tasks")).json()).tasks); } catch {} };
+$("addtask").addEventListener("keydown", async e => {
+  if (e.key !== "Enter" || !e.target.value.trim()) return;
+  renderTasks((await (await post("/tasks", { action: "add", text: e.target.value })).json()).tasks); e.target.value = "";
+});
+loadTasks(); setInterval(loadTasks, 8000);
+
+// =============== news ===============
+let news = null, codePage = 0, wirePage = 0;
+const PER = 6;
+function itemHtml(n, badge) {
+  return `<div class="item" data-url="${esc(n.url)}"><span class="src">${esc(badge)}</span><span><span class="t">${esc(n.title)}</span>${n.meta ? `<span class="meta">${esc(n.meta)}</span>` : ""}</span></div>`;
+}
+function pageOf(list, page) { const pages = Math.max(1, Math.ceil(list.length / PER)); page %= pages; return [list.slice(page * PER, page * PER + PER), page, pages]; }
+function renderNews() {
+  if (!news) return;
+  const code = news.code.map(n => ({ ...n, meta: n.score ? `▲ ${n.score}` : "" }));
+  const [c, cp, cps] = pageOf(code, codePage);
+  $("code").innerHTML = c.map(n => itemHtml(n, n.source === "Hacker News" ? "HN" : n.source)).join("");
+  $("code-page").textContent = `${cp + 1}/${cps}`;
+  const [w, wp, wps] = pageOf(news.wire, wirePage);
+  $("wire").innerHTML = w.map(n => itemHtml(n, { "TechCrunch": "TC", "The Verge": "VRG", "Ars Technica": "ARS", "IEEE Spectrum": "IEEE" }[n.source] || n.source)).join("");
+  $("wire-page").textContent = `${wp + 1}/${wps}`;
+  $("topics").innerHTML = news.topics.slice(0, 9).map(t => `<span class="chip">#${esc(t)}</span>`).join("");
+  $("repos").innerHTML = news.repos.slice(0, 3).map(r => itemHtml({ title: r.title, url: r.url, meta: `★ ${r.stars.toLocaleString()} · ${r.desc}` }, r.lang ? r.lang.slice(0, 4) : "GIT")).join("");
+}
+function renderTicker() {
+  if (!news) return;
+  const parts = [...news.wire.slice(0, 14).map(n => [n.source, n]), ...news.code.slice(0, 8).map(n => ["TRENDING", n]),
+    ...news.repos.slice(0, 5).map(r => ["GITHUB", { title: `${r.title} — ${r.desc}`, url: r.url }])];
+  const html = parts.map(([s, n]) => `<b>${esc(s.toUpperCase())}</b><a data-url="${esc(n.url)}">${esc(n.title)}</a>`).join("");
+  $("ticker-track").innerHTML = html + html;  // doubled for a seamless loop
+  $("ticker-track").style.setProperty("--dur", Math.max(120, parts.length * 9) + "s");
+}
+async function loadNews() {
+  try { const n = await (await fetch("/news")).json(); if (n.updated) { news = n; renderNews(); renderTicker(); } } catch {}
+  if (!news) setTimeout(loadNews, 4000);
+}
+document.addEventListener("click", e => { const el = e.target.closest("[data-url]"); if (el) open_(el.dataset.url); });
+loadNews(); setInterval(loadNews, 10 * 60 * 1000);
+setInterval(() => { codePage++; wirePage++; renderNews(); }, 14000);
+
+// =============== comms log / state ===============
+function render() {
+  const speaking = audio.playing || serverSpeaking;
+  const listeningCmd = ears.mode === "command" || ears.mode === "permission";
+  document.body.classList.toggle("thinking", busy && !speaking);
+  document.body.classList.toggle("listening", listeningCmd);
+  $("mic").classList.toggle("live", listeningCmd);
+  $("state").textContent = ears.mode === "permission" ? "AWAITING PERMISSION" : listeningCmd ? "LISTENING"
+    : speaking ? "SPEAKING" : busy ? "PROCESSING" : "STANDING BY";
+}
+function addMsg(who, text) {
+  const div = document.createElement("div"); div.className = "msg " + (who === "me" ? "me" : "ai");
+  div.innerHTML = `<b>${who === "me" ? "DEV" : "JARVIS"}</b>`; div.append(document.createTextNode(text));
+  $("log").append(div); $("log").scrollTop = $("log").scrollHeight; return div;
+}
+function caption(text) { $("caption").innerHTML = `<span>${esc(text.length > 230 ? "…" + text.slice(-230) : text)}</span>`; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// =============== JARVIS's voice (played here so the visualizer can see it) ===============
+const audio = {
+  ctx: null, out: null, queue: [], playing: false, source: null, mode: "browser", idleWaiters: [],
+  init() {
+    if (this.ctx) return;
+    this.ctx = new AudioContext();
+    this.out = this.ctx.createAnalyser(); this.out.fftSize = 1024; this.out.smoothingTimeConstant = .72;
+    this.out.connect(this.ctx.destination);
+  },
+  async unlock() { this.init(); try { await this.ctx.resume(); } catch {} return this.ctx.state === "running"; },
+  enqueue(id) {
+    if (!id) return;
+    if (this.mode === "server") { post("/play", { id }); return; }
+    this.queue.push(id); this.next();
+  },
+  async next() {
+    if (this.playing || !this.queue.length) return;
+    if (!(await this.unlock())) {  // autoplay blocked: hand everything to the laptop speakers
+      this.mode = "server"; this.queue.splice(0).forEach(id => post("/play", { id })); return;
+    }
+    const id = this.queue.shift(); this.playing = true; render(); post("/speaking", { on: true });
+    try {
+      const buf = await this.ctx.decodeAudioData(await (await fetch("/audio/" + id)).arrayBuffer());
+      if (!this.playing) return;  // stopped while loading
+      const src = this.ctx.createBufferSource(); src.buffer = buf; src.connect(this.out); this.source = src;
+      src.onended = () => this.finished(src);
+      src.start();
+    } catch { this.finished(null); }
+  },
+  finished(src) {
+    if (src && src !== this.source) return;
+    this.playing = false; this.source = null;
+    if (!this.queue.length) { post("/speaking", { on: false }); render(); this.idleWaiters.splice(0).forEach(f => f()); onSpeechDone(); }
+    this.next();
+  },
+  stop() {
+    this.queue = []; if (this.source) { try { this.source.onended = null; this.source.stop(); } catch {} }
+    this.source = null; const was = this.playing; this.playing = false; post("/hush");
+    if (was) this.idleWaiters.splice(0).forEach(f => f());
+    render();
+  },
+  async untilQuiet(maxMs = 20000) {  // resolves when JARVIS has finished speaking
+    const t0 = Date.now();
+    await sleep(150);
+    while (Date.now() - t0 < maxMs && (this.playing || this.queue.length || serverSpeaking)) await sleep(120);
+  },
+};
+async function sayLine(text, { cache = true, log = true } = {}) {  // speak without Claude
+  if (log) { addMsg("ai", text); caption(text); }
+  try { audio.enqueue((await (await post("/say", { text, cache })).json()).id); } catch {}
+}
+function onSpeechDone() {
+  if (awaitingFollowUp && handsFree && !busy && !ears.mode && !permOpen) {
+    awaitingFollowUp = false; setTimeout(() => startListening(8000), 200);
+  }
+}
+document.addEventListener("pointerdown", () => audio.unlock(), { once: true });
+document.addEventListener("keydown", () => audio.unlock(), { once: true });
+
+// =============== words that act instantly (no waiting for Claude) ===============
+const SLEEP_WORDS = /\b(go(ing)? to sleep|sleep now|good ?bye|bye( bye)?|good ?night|close (the |this )?(window|interface|hud|screen|app)|shut (the |this )?(window|interface|hud) down|that'?s all( for now)?|dismissed|see you( later)?|you can (rest|sleep)|rest now)\b/i;
+const STOP_WORDS = /\b(stop|wait|hold on|shut up|enough|quiet|pause|cancel|jarvis|never ?mind)\b/i;
+const HOME_WORDS = /\b(wake up|daddy'?s home|daddy is home|i'?m home|i am home)\b/i;
+const YES = /\b(yes|yeah|yep|yup|sure|ok(ay)?|go ahead|do it|allow|proceed|affirmative|please do|absolutely|confirm(ed)?)\b/i;
+const NO = /\b(no|nope|nah|don'?t|do not|deny|cancel|stop|negative|never ?mind|wait|hold on)\b/i;
+const CONFIRM = /\b(confirm(ed)?|i confirm|yes,? confirm|confirmed)\b/i;
+
+// =============== talking to Claude (streamed, interruptible) ===============
+let current = null;   // { ctrl, shown } for the answer in progress
+
+async function ask(text, { silent = false } = {}) {
+  if (!text.trim()) return;
+  if (!silent) addMsg("me", text);
+  if (!silent && SLEEP_WORDS.test(text)) return goToSleep();
+  if (busy) await bargeIn({ listen: false });
+  audio.stop(); busy = true; render(); caption("…");
+  const me = current = { ctrl: new AbortController(), shown: "" };
+  let msg = null;
+  try {
+    const res = await fetch("/ask", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }), signal: me.ctrl.signal });
+    const reader = res.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.t === "text") { me.shown += ev.d; caption(me.shown.trim()); msg = msg || addMsg("ai", ""); msg.lastChild.textContent = me.shown.trim(); $("log").scrollTop = 1e9; }
+        else if (ev.t === "audio") audio.enqueue(ev.id);
+        else if (ev.t === "permission") askPermission(ev);
+        else if (ev.t === "done" && !me.shown.trim() && ev.text) { addMsg("ai", ev.text); caption(ev.text); }
+      }
+    }
+    if (current === me) {
+      awaitingFollowUp = true;
+      if (!audio.playing && !audio.queue.length && audio.mode === "browser") onSpeechDone();
+    }
+    loadTasks();
+  } catch (e) { if (e.name !== "AbortError") caption("Connection to the JARVIS server lost."); }
+  if (current === me) { busy = false; current = null; render(); }
+}
+
+// Dev said "stop" (or started a new command) while JARVIS was thinking or talking.
+async function bargeIn({ listen = true } = {}) {
+  const was = current; current = null;
+  if (was) was.ctrl.abort();
+  audio.stop(); busy = false; awaitingFollowUp = false; render();
+  await post("/cancel");
+  if (listen) { caption("Stopped. I'm listening."); chime(); startListening(7000); }
+}
+
+async function goToSleep() {
+  if (current) { current.ctrl.abort(); current = null; post("/cancel"); }
+  busy = false; awaitingFollowUp = false; ears.stop();
+  audio.stop();
+  const bye = new Date().getHours() >= 20 || new Date().getHours() < 4 ? "Goodnight, Dev." : "Very good, Dev. I'll be listening if you need me.";
+  await sayLine(bye);
+  await Promise.race([audio.untilQuiet(6000), sleep(6000)]);
+  window.close();  // the background listener keeps running
+}
+$("text").addEventListener("keydown", e => { if (e.key === "Enter") { ask(e.target.value); e.target.value = ""; } });
+
+// =============== permission requests ===============
+let permOpen = false;
+const permQueue = [];
+async function askPermission(ev) {
+  permQueue.push(ev);
+  if (permOpen) return;
+  while (permQueue.length) {
+    const p = permQueue.shift();
+    try { await runPermission(p); }
+    catch (e) { hudLog(`permission card failed: ${e}`); post("/permission", { id: p.id, allow: false }); }
+    finally { $("perm").classList.remove("show"); permOpen = false; render(); }  // never leave listening frozen
+  }
+}
+function permButtons() {
+  return new Promise(resolve => {
+    $("p-allow").onclick = () => resolve(true); $("p-deny").onclick = () => resolve(false);
+    permButtons.cancel = () => resolve(null);
+  });
+}
+async function hearAnswer(pattern, ms) {  // listen for a short spoken answer; returns the transcript or ""
+  return new Promise(resolve => ears.listen("permission", { timeoutMs: ms, onFinal: resolve, instant: pattern }));
+}
+async function runPermission(ev) {
+  permOpen = true; render();
+  const card = $("perm");
+  card.classList.toggle("danger", !!ev.danger); card.classList.add("show");
+  $("p-title").textContent = ev.danger ? "⚠ IMPORTANT ACTION — PERMISSION REQUIRED" : "PERMISSION REQUIRED";
+  $("p-sum").textContent = ev.summary.charAt(0).toUpperCase() + ev.summary.slice(1);
+  $("p-detail").textContent = ev.detail || ev.tool; $("p-detail").style.display = ev.detail ? "" : "none";
+  $("p-hint").textContent = "Say “yes” or “no” — or use the buttons.";
+  $("p-allow").textContent = "ALLOW"; addMsg("ai", `[Permission] ${ev.summary}`);
+  const clicked = permButtons();
+
+  await audio.untilQuiet(15000);
+  sayLine(`Dev, I'd like to ${ev.summary}. Shall I go ahead?`, { cache: false, log: false });
+  await audio.untilQuiet(15000);
+
+  let allow = null;
+  for (let attempt = 0; attempt < 2 && allow === null; attempt++) {
+    const heard = Promise.race([hearAnswer(new RegExp(`${YES.source}|${NO.source}`, "i"), 9000), clicked.then(v => ({ v }))]);
+    const r = await heard;
+    if (typeof r === "object") allow = r.v;                       // a button was clicked
+    else if (NO.test(r)) allow = false;
+    else if (YES.test(r)) allow = true;
+    else if (attempt === 0) { sayLine("Sorry, was that a yes or a no?", { log: false }); await audio.untilQuiet(6000); }
+  }
+  ears.stop();
+
+  if (allow && ev.danger) {  // second, explicit confirmation for anything important
+    $("p-hint").textContent = "This is important. Say “confirm” to proceed — anything else cancels.";
+    $("p-allow").textContent = "CONFIRM";
+    sayLine("This one is important. Say confirm to go ahead, or cancel.", { log: false });
+    await audio.untilQuiet(8000);
+    const clicked2 = permButtons();
+    const r = await Promise.race([hearAnswer(new RegExp(`${CONFIRM.source}|${NO.source}`, "i"), 9000), clicked2.then(v => ({ v }))]);
+    allow = typeof r === "object" ? r.v : CONFIRM.test(r) && !/\b(no|don'?t|cancel)\b/i.test(r);
+    ears.stop();
+  }
+
+  allow = !!allow;
+  await post("/permission", { id: ev.id, allow });
+  addMsg("me", allow ? "✓ Allowed" : "✕ Denied");
+  if (!allow) sayLine("Understood, I won't do it.", { log: false });
+  card.classList.remove("show"); permOpen = false; render();
+}
+
+// =============== waking up ===============
+function chime(up = true) {
+  try {
+    audio.init(); const ac = audio.ctx, t = ac.currentTime;
+    (up ? [660, 990] : [880, 587]).forEach((f, i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(audio.out);
+      g.gain.setValueAtTime(0, t + i * .1); g.gain.linearRampToValueAtTime(.13, t + i * .1 + .02);
+      g.gain.exponentialRampToValueAtTime(.001, t + i * .1 + .25); o.start(t + i * .1); o.stop(t + i * .1 + .27);
+    });
+  } catch {}
+}
+function briefing(phrase) {
+  const morning = new Date().getHours() < 12;
+  sayLine(morning ? "Good morning, Dev. Pulling up your day now." : "Welcome home, Dev. Pulling up your day now.");
+  ask(`Dev just said "${phrase}" — their cue that they're home and want you up and running. You have ALREADY welcomed them ` +
+      `out loud, so don't greet again. Give a short spoken brief of what's happening: today's remaining calendar events and ` +
+      `unread emails that need attention (check Google Calendar and Gmail quickly), plus open tasks from tasks.md. ` +
+      `Then ask whether they'd like to hear the international tech news. Under 90 words.`, { silent: true });
+}
+function onWake(reason, phrase) {
+  if (reason === "stop") { if (!permOpen) { addMsg("me", phrase || "stop"); bargeIn(); } return; }  // offline "stop" detector
+  if (permOpen || busy || audio.playing || ears.mode === "command") return;  // already awake
+  audio.unlock();
+  if (phrase && HOME_WORDS.test(phrase)) { addMsg("me", phrase); return briefing(phrase); }
+  if (phrase) addMsg("me", phrase);
+  wakeReason = reason || "clap"; chime(); caption("Yes, Dev?");
+  setTimeout(() => startListening(6500), 250);
+}
+
+// =============== ears: one speech recognizer, three modes ===============
+//  command    — Dev is giving an instruction (after a wake, Space, click or a follow-up)
+//  sentinel   — while JARVIS thinks or talks, listen only for "stop" / "go to sleep" (barge-in)
+//  permission — waiting for a yes / no / confirm
+// Listening is done OFFLINE by the background listener (wake/clap.py → Whisper on this laptop). Edge's built-in
+// speech service heard sound but never returned words here, which left JARVIS stuck on "standing by".
+// The page asks the server for a listen session; the listener records Dev, transcribes, and posts the text back.
+const hudLog = msg => post("/log", { msg }).catch(() => {});
+const ears = {
+  mode: null, id: 0, token: 0, handlers: null, timer: null, phase: "",
+  async listen(mode, { timeoutMs, onFinal, onInterim } = {}) {
+    if (mode === "sentinel") return;  // "stop" while JARVIS talks is caught offline by the background listener
+    const token = ++this.token, wait = timeoutMs || 12000;
+    if (this.id) post("/listen/stop", { id: this.id });
+    this.mode = mode; this.id = 0; this.phase = "waiting"; this.handlers = { onFinal, onInterim }; render();
+    try {
+      const { id } = await (await post("/listen", { mode, timeoutMs: wait })).json();
+      if (token !== this.token) { post("/listen/stop", { id }); return; }
+      this.id = id;
+    } catch { this.mode = null; render(); caption("Can't reach the JARVIS listener."); return; }
+    clearTimeout(this.timer);  // safety net: never wait forever
+    this.timer = setTimeout(() => { if (token === this.token && this.mode) { hudLog(`no transcript for ${mode} session ${this.id}`); this.deliver(this.id, ""); } }, wait + 30000);
+  },
+  deliver(id, text) {  // the status poll saw the listener's transcript
+    if (!id || id !== this.id || !this.mode) return;
+    const { onFinal, onInterim } = this.handlers || {};
+    clearTimeout(this.timer); this.mode = null; this.handlers = null; this.id = 0; this.phase = ""; render();
+    if (text && onInterim && onInterim(text) === true) return;
+    if (onFinal) onFinal((text || "").trim());
+  },
+  stop() {
+    this.token++; clearTimeout(this.timer);
+    if (this.id) post("/listen/stop", { id: this.id });
+    this.mode = null; this.id = 0; this.handlers = null; this.phase = ""; render();
+  },
+};
+
+function startListening(timeoutMs) {
+  if (permOpen) return;
+  if (busy || audio.playing) { bargeIn(); return; }
+  audio.stop();
+  const woke = wakeReason;
+  if (!woke) caption("Listening…");
+  ears.listen("command", {
+    timeoutMs,
+    onInterim: heard => {
+      caption(heard || "…");
+      if (SLEEP_WORDS.test(heard)) { addMsg("me", heard); ears.stop(); goToSleep(); return true; }
+    },
+    onFinal: text => {
+      wakeReason = "";
+      if (SLEEP_WORDS.test(text)) return;  // already handled on the interim result
+      if (text && HOME_WORDS.test(text) && (woke || !$("log").children.length)) { addMsg("me", text); briefing(text); }
+      else if (text) ask(text);
+      else if (woke) { awaitingFollowUp = true; sayLine(woke === "manual" ? "At your service, Dev." : "Yes, Dev?"); }
+      else caption("I didn't catch anything — clap, say “Jarvis”, or press Space and speak.");
+    },
+  });
+}
+
+// Barge-in: while JARVIS is busy or talking, keep an ear open for "stop" / "go to sleep".
+function sentinel() {
+  const active = (busy || audio.playing || serverSpeaking) && !permOpen;
+  if (active && !ears.mode) {
+    ears.listen("sentinel", {
+      onInterim: heard => {
+        const said = (current?.shown || "").toLowerCase();
+        if (SLEEP_WORDS.test(heard)) { addMsg("me", heard); ears.stop(); goToSleep(); return true; }
+        const m = heard.match(STOP_WORDS);
+        if (m && !said.includes(m[0].toLowerCase())) {  // ignore JARVIS hearing its own words
+          addMsg("me", heard); ears.stop(); bargeIn(); return true;
+        }
+      },
+    });
+  } else if (!active && ears.mode === "sentinel") ears.stop();
+}
+setInterval(sentinel, 300);
+
+$("mic").onclick = () => ears.mode === "command" ? ears.stop() : startListening();
+$("reactor").onclick = () => ears.mode === "command" ? ears.stop() : startListening();
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space" && !e.repeat) { e.preventDefault(); startListening(); }
+  if (e.key === "Escape") { if (permOpen) permButtons.cancel?.(); else bargeIn({ listen: false }); }
+});
+$("hands").onclick = () => { handsFree = !handsFree; $("hands").classList.toggle("on", handsFree); };
+$("hush").onclick = () => bargeIn({ listen: false });
+$("new").onclick = () => { $("log").innerHTML = ""; caption("Fresh conversation. What can I do for you, Dev?"); post("/reset"); };
+
+// =============== server status: wake signals, brain readiness, fallback speech ===============
+let wakeSeen = null, serverWas = false;
+setInterval(async () => {
+  try {
+    const s = await (await fetch("/status")).json();
+    serverSpeaking = s.speaking && !audio.playing;
+    $("brain-dot").classList.toggle("ok", s.brain_ready);
+    $("sys").textContent = s.brain_ready ? "PERSONAL ASSISTANT · ONLINE" : "WARMING UP";
+    const L = s.listen || {};
+    if (ears.mode && L.heard_id && L.heard_id === ears.id) ears.deliver(L.heard_id, L.heard_text);
+    else if (ears.mode && L.id === ears.id && L.phase !== ears.phase) {
+      ears.phase = L.phase;
+      if (L.phase === "recording") caption("● Listening…");
+      else if (L.phase === "transcribing") caption("…");
+    }
+    if (wakeSeen === null) wakeSeen = s.wake;
+    else if (s.wake !== wakeSeen) { wakeSeen = s.wake; onWake(s.wake_reason, s.wake_phrase); }
+    if (audio.mode === "server" && serverWas && !s.speaking) onSpeechDone();
+    serverWas = s.speaking;
+    render();
+  } catch {}
+}, 200);
+
+// =============== mic tap for the visualizer ===============
+let mic = null;
+(async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    audio.init();
+    mic = audio.ctx.createAnalyser(); mic.fftSize = 1024; mic.smoothingTimeConstant = .68;
+    audio.ctx.createMediaStreamSource(stream).connect(mic);
+  } catch {}
+})();
+
+// =============== what the 3D core needs to know (read every frame by core3d.js) ===============
+window.visState = () => ({
+  state: permOpen ? 'permission' : ears.mode === 'command' ? 'listening' : audio.playing ? 'speaking' : busy ? 'thinking' : 'idle',
+  analyser: audio.playing ? audio.out : mic,
+  loud: audio.playing || ears.mode === 'command',
+  stage: $('reactor'),
+});
+
+// =============== opened by the background listener ===============
+const qs = new URLSearchParams(location.search), w0 = qs.get("wake");
+if (w0) { history.replaceState(null, "", "/"); setTimeout(() => onWake(w0, qs.get("phrase") || ""), 400); }
+</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="/core3d.js"></script>
+</body>
+</html>

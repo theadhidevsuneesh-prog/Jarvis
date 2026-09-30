@@ -1,0 +1,68 @@
+--- PAGE 1 ---
+OPEN SOURCE ASSISTANT
+JARVIS — Full Setup Guide
+Turn a plain app into a voice assistant that reads your morning, talks back to you, and plugs directly into your
+personal tools (calendar, inbox, dashboards). It's open source, so it stays yours forever — no subscription lock-in
+on the assistant itself.
+Time needed: ~20–30 minutes Difficulty: Beginner-friendly (Claude does the heavy lifting)
+💡 The core workflow: You don't build this by hand. You install Claude Code, provide it the project's GitHub repo link,
+and it automatically pulls files, installs dependencies, and configures runtime execution. You just supply API keys and
+connect your tools.
+☑ Before You Start
+A computer running macOS 13+, Windows 10+ (1809+), 4 GB+ RAM and an active internet connection
+or Linux (Ubuntu 20.04+ / Debian 10+)
+A paid Claude plan (Pro, Max, Team, or Enterprise) — A GitHub account
+Claude Code is not available on free Claude.ai
+An ElevenLabs account (free tier provides ~10k voice The GitHub link for the assistant project you want to
+credits/month) install
+1 Step 1 — Install Claude Code
+Claude Code is the CLI agent that orchestrates setup and runs everything. Open your terminal and run the command for your
+OS:
+MACOS / LINUX / WSL
+curl -fsSL https://claude.ai/install.sh | bash
+WINDOWS (POWERSHELL)
+irm https://claude.ai/install.ps1 | iex
+ALTERNATIVE (ANY OS, REQUIRES NODE.JS 18+)
+npm install -g @anthropic-ai/claude-code
+VERIFY INSTALLATION & DIAGNOSTIC CHECK
+claude --version # should print version number claude doctor # checks installation
+integrity and PATH
+🐻 Troubleshooting tip: If you get command not found: claude , close and restart your terminal so your shell loads
+the newly updated PATH. Run claude doctor if issues persist.
+JARVIS — Full Setup Guide Page 1 of 2
+--- PAGE 2 ---
+2 Step 2 — Hand Claude the Project & Install
+Create a dedicated workspace folder, enter it, and initialize Claude Code:
+mkdir jarvis && cd jarvis claude
+Note for standard Windows PowerShell 5.1: use semicolon separators ( mkdir jarvis; cd jarvis; claude).
+Paste this prompt into Claude Code (substituting your target repo URL):
+"Clone this repo into the current folder, read its README, install all dependencies, and get it running. Tell me anything you
+need from me (API keys, config, etc.) as you go: <PASTE-YOUR-REPO-URL>"
+💡 If you don't have a project picked yet, search GitHub for "Claude voice assistant" or "voice MCP" projects and provide
+that link.
+3 Step 3 — Add ElevenLabs Voice Output
+3A. GET API KEY 3B. PICK VOICE
+1. Sign in at elevenlabs.io 1. Navigate to Voices / Voice Library
+2. Open profile → API Keys → create key 2. Preview options and select preferred voice
+3. Copy and store safely 3. Copy the Voice ID for configuration
+3C. REGISTER ELEVENLABS MCP SERVER
+# Install uv helper (macOS/Linux) curl -LsSf https://astral.sh/uv/install.sh | sh # Add
+ElevenLabs MCP to Claude Code claude mcp add elevenlabs --env ELEVENLABS_API_KEY=<your-key-
+here> -- uvx elevenlabs-mcp
+4 Step 4 & 5 — Connect Tools & Run Morning Brief
+Connect your everyday apps (Calendar, Gmail, Slack, Notion) via MCP server commands:
+claude mcp add <tool-name> --env KEY=value -- <command-to-run-that-server> claude mcp
+list # verify all active connected tools
+EXECUTE MORNING ROUTINE
+"Give me my morning brief out loud: what's pending, what's important, and which emails I still haven't replied to."
+🛠 Quick Troubleshooting Reference
+Problem Fix
+command not found: claude Reopen your terminal, then run claude doctor . Terminal needs a fresh
+shell to reload PATH.
+Billed API rates while on Pro/Max An ANTHROPIC_API_KEY in environment overrides your subscription. Unset
+it: unset ANTHROPIC_API_KEY .
+MCP server not showing up Restart Claude Code, then run claude mcp list to confirm registration
+status.
+No sound / voice errors Double-check your ElevenLabs API key and confirm you have available credits
+in your account dashboard.
+JARVIS — Full Setup Guide Page 2 of 2

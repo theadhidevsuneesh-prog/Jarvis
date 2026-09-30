@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["C:/Users/ADHIDEV/Desktop/jarvis/voice/speak.py"],
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:wttr.in)",
+      "WebSearch",
+      "WebFetch",
+      "Read",
+      "Edit(C:/Users/ADHIDEV/Desktop/jarvis/notes.md)",
+      "Edit(C:/Users/ADHIDEV/Desktop/jarvis/news.md)",
+      "Read(C:/Users/ADHIDEV/Desktop/jarvis/**)",
+      "Edit(C:/Users/ADHIDEV/Desktop/jarvis/tasks.md)"
+    ]
+  }
+}

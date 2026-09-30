@@ -1,0 +1,7 @@
+.env
+mute
+*.log
+__pycache__/
+.venv/
+node_modules/
+
