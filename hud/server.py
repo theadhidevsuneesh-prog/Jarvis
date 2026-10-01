@@ -773,7 +773,23 @@ def prewarm_lines():
             pass
 
 
+def listener_watchdog():
+    """The offline listener (wake/clap.py) does all the hearing. If it has died, start it again."""
+    script = os.path.join(ROOT, "wake", "clap.py")
+    pyw = sys.executable.replace("python.exe", "pythonw.exe")
+    while True:
+        try:
+            alive = any(script.lower() in " ".join(p.info["cmdline"] or []).lower() and "--open" not in (p.info["cmdline"] or [])
+                        for p in psutil.process_iter(["cmdline"]))
+            if not alive:
+                speak.log("listener (clap.py) was not running; restarting it")
+                subprocess.Popen([pyw, script], cwd=ROOT, creationflags=NO_WINDOW)
+        except Exception as e:
+            speak.log(f"listener watchdog error: {e!r}")
+        time.sleep(30)
+
+
 if __name__ == "__main__":
-    for target in (sample_forever, news_forever, local_player, brain.warm, prewarm_lines):
+    for target in (sample_forever, news_forever, local_player, brain.warm, prewarm_lines, listener_watchdog):
         threading.Thread(target=target, daemon=True).start()
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

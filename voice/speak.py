@@ -119,9 +119,12 @@ def clean_for_speech(text):
 
 # ---------- synthesis ----------
 
+_eleven_blocked = {}  # api key -> time before which it isn't tried again
+
+
 def synth_elevenlabs(text, out, env):
     key = env.get("ELEVENLABS_API_KEY")
-    if not key:
+    if not key or time.time() < _eleven_blocked.get(key, 0):
         return False
     voice = env.get("ELEVENLABS_VOICE_ID") or DEFAULT_ELEVEN_VOICE
     if voice == read_refused():
@@ -129,6 +132,10 @@ def synth_elevenlabs(text, out, env):
     try:
         eleven_request(text, out, key, voice)
     except urllib.error.HTTPError as e:
+        if e.code in (401, 403):  # bad/expired key: skip ElevenLabs for 10 min instead of failing every sentence
+            _eleven_blocked[key] = time.time() + 600
+            log(f"ElevenLabs key rejected ({e.code}); using free voice for 10 min. Fix ELEVENLABS_API_KEY in .env")
+            return False
         # Free plans can't use Voice Library voices via the API (402); fall back to a default voice.
         if e.code not in (402, 404) or voice == DEFAULT_ELEVEN_VOICE:
             raise

@@ -444,6 +444,10 @@ def main():
         COOLDOWN = 0
         wake("manual")
         return
+    # Only one listener at a time (the HUD server's watchdog and the startup shortcut may both try to start one).
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "Global\\JarvisClapListener")
+    if ctypes.windll.kernel32.GetLastError() == 183 and not TEST:  # ERROR_ALREADY_EXISTS
+        return
     claps, word = ClapDetector(), WakeWord()
     stopper = StopWord(word.model)
     recorder = Recorder(claps)
