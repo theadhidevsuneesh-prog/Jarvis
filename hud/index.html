@@ -418,7 +418,11 @@ document.addEventListener("pointerdown", () => audio.unlock(), { once: true });
 document.addEventListener("keydown", () => audio.unlock(), { once: true });
 
 // =============== words that act instantly (no waiting for Claude) ===============
-const SLEEP_WORDS = /\b(go(ing)? to sleep|sleep now|good ?bye|bye( bye)?|good ?night|close (the |this )?(window|interface|hud|screen|app)|shut (the |this )?(window|interface|hud) down|that'?s all( for now)?|dismissed|see you( later)?|you can (rest|sleep)|rest now)\b/i;
+// Closing the window must be deliberate: an explicit phrase in a SHORT utterance. Casual "bye", "that's all", "see you"
+// inside a normal sentence (or Whisper hallucinating them from noise) no longer shuts JARVIS's window.
+const SLEEP_STRONG = /\b(go(ing)? to sleep|sleep now|close (the |this )?(window|interface|hud|screen|app)|shut (the |this )?(window|interface|hud) down)\b/i;
+const SLEEP_WEAK = /^\W*(jarvis\W+)?(good ?bye|good ?night|that'?s all( for now)?|dismissed)(\W+jarvis)?\W*$/i;
+const SLEEP_WORDS = { test: t => { const n = (t || "").trim().split(/\s+/).length; return (n <= 8 && SLEEP_STRONG.test(t)) || SLEEP_WEAK.test(t || ""); } };
 const STOP_WORDS = /\b(stop|wait|hold on|shut up|enough|quiet|pause|cancel|jarvis|never ?mind)\b/i;
 const HOME_WORDS = /\b(wake up|daddy'?s home|daddy is home|i'?m home|i am home)\b/i;
 const YES = /\b(yes|yeah|yep|yup|sure|ok(ay)?|go ahead|do it|allow|proceed|affirmative|please do|absolutely|confirm(ed)?)\b/i;

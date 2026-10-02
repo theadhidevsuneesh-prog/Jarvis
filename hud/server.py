@@ -129,6 +129,45 @@ class Gate:
 gate = Gate()
 
 
+# ----------------------------------------------------------------------
+# Memory: every exchange is logged, and each fresh brain starts with Dev's notes + the most recent conversation,
+# so JARVIS remembers across restarts, sleeps and the 30-minute idle reset. Long-term facts live in notes.md
+# (JARVIS edits it itself); the raw log lives in memory/history.jsonl (git-ignored, private).
+# ----------------------------------------------------------------------
+
+MEM_DIR = os.path.join(ROOT, "memory")
+HISTORY = os.path.join(MEM_DIR, "history.jsonl")
+NOTES_MD = os.path.join(ROOT, "notes.md")
+os.makedirs(MEM_DIR, exist_ok=True)
+
+
+def log_exchange(user, reply):
+    try:
+        with open(HISTORY, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"t": datetime.datetime.now().isoformat(timespec="seconds"),
+                                "dev": user[:1500], "jarvis": (reply or "")[:1500]}, ensure_ascii=False) + "\n")
+    except OSError as e:
+        speak.log(f"memory write failed: {e!r}")
+
+
+def memory_prompt():
+    parts = ["You are JARVIS. Below is your long-term memory of Dev. Treat it as things you genuinely remember."]
+    try:
+        with open(NOTES_MD, encoding="utf-8") as f:
+            parts.append("## Your notes about Dev (notes.md)\n" + f.read()[:5000])
+    except OSError:
+        pass
+    try:
+        with open(HISTORY, encoding="utf-8") as f:
+            recent = [json.loads(l) for l in f.read().splitlines()[-14:] if l.strip()]
+        if recent:
+            parts.append("## Your most recent conversations with Dev (oldest first)\n" + "\n".join(
+                f"[{r['t']}] Dev: {r['dev'][:300]}\n        You: {r['jarvis'][:300]}" for r in recent))
+    except (OSError, ValueError, KeyError):
+        pass
+    return "\n\n".join(parts)[:9000]
+
+
 class Brain:
     def __init__(self):
         self.proc = None
@@ -144,7 +183,8 @@ class Brain:
         errlog = open(BRAIN_LOG, "a", encoding="utf-8")
         self.proc = subprocess.Popen(
             [CLAUDE, "-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
-             "--include-partial-messages", "--model", MODEL, "--permission-prompt-tool", "stdio"],
+             "--include-partial-messages", "--model", MODEL, "--permission-prompt-tool", "stdio",
+             "--append-system-prompt", memory_prompt()],
             cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=errlog, text=True,
             encoding="utf-8", errors="replace", env=env, creationflags=NO_WINDOW)
         self.lines = queue.Queue()
@@ -398,6 +438,8 @@ def stream_answer(text, emit):
         sentences.put(buf[0].strip())
     sentences.put(None)
     worker.join(timeout=60)
+    if reply or state.get("reply_text"):
+        log_exchange(re.sub(r"^\[HUD[^\]]*\]\s*", "", text), reply or state.get("reply_text", ""))
     raw_emit({"t": "done", "text": reply, "cancelled": not live()})
 
 

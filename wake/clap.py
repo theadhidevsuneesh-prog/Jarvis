@@ -50,10 +50,31 @@ WAKE_WORD_ON = (env.get("WAKE_WORD") or "on").lower() != "off"
 NAMES = ["jarvis", "sweetheart", "baby", "buddy", "darling", "honey"]
 # Bare pet names ("honey", "buddy") are too easy to mishear from background talk, so from the background they only
 # count as phrases ("hey buddy", "wake up sweetheart"). "jarvis" alone is allowed but needs high confidence.
-WAKE_PHRASES = sorted({"jarvis", *(f"hey {n}" for n in NAMES), *(f"wake up {n}" for n in NAMES), *(f"okay {n}" for n in NAMES),
+WAKE_PHRASES = sorted({"jarvis", *NAMES, "wake up", "wake", "daddy", "home",
+                       *(f"hey {n}" for n in NAMES), *(f"wake up {n}" for n in NAMES), *(f"wake {n}" for n in NAMES),
+                       *(f"okay {n}" for n in NAMES), *(f"{n} wake up" for n in NAMES),
                        "wake up daddy's home", "daddy's home", "daddy is home", "i'm home", "i am home",
                        *(f"wake up {n} daddy's home" for n in NAMES), *(f"wake up {n} daddy is home" for n in NAMES)})
-WAKE_SET = set(WAKE_PHRASES)
+BARE_NAMES_ON = (env.get("WAKE_BARE_NAMES") or "on").lower() != "off"
+
+
+def is_wake(text, conf):
+    """Decide whether a (grammar-constrained) Vosk result is Dev calling JARVIS. Forgiving on purpose: a false wake
+    only opens the HUD, a missed wake is exactly the 'it never answers me' problem."""
+    words = text.replace("'", "").split()
+    if not words:
+        return False
+    if "jarvis" in words:
+        return conf >= 0.4
+    if any(w in NAMES for w in words):
+        if len(words) == 1:  # a lone "baby" / "honey" could be song lyrics or TV, so ask for a clear hearing
+            return BARE_NAMES_ON and conf >= 0.75
+        return conf >= 0.5
+    if "home" in words and ("daddys" in words or "daddy" in words or "im" in words or "i" in words):
+        return conf >= 0.45
+    if words[:2] == ["wake", "up"] or words == ["wake"]:
+        return conf >= 0.6
+    return False
 
 last_wake = float("-inf")
 wake_lock = threading.Lock()
@@ -109,6 +130,20 @@ def hud_running():
         return False
 
 
+def ensure_hud_server():
+    """Start hud/server.py (no window) if it isn't running. Returns True when it answers."""
+    if hud_running():
+        return True
+    pyw = sys.executable.replace("python.exe", "pythonw.exe")
+    subprocess.Popen([pyw, os.path.join(ROOT, "hud", "server.py")], cwd=ROOT, creationflags=NO_WINDOW)
+    for _ in range(60):
+        if hud_running():
+            return True
+        time.sleep(0.25)
+    speak.log("HUD server did not start within 15 s")
+    return False
+
+
 def post(path, payload=None):
     req = urllib.request.Request(HUD_URL + path, data=json.dumps(payload or {}).encode(),
                                  headers={"Content-Type": "application/json"})
@@ -125,13 +160,7 @@ def wake(reason, phrase=""):
     speak.log(f"wake: {reason}")
     if TEST:
         print(f"\n>>> WAKING JARVIS ({reason})")
-    if not hud_running():
-        pyw = sys.executable.replace("python.exe", "pythonw.exe")
-        subprocess.Popen([pyw, os.path.join(ROOT, "hud", "server.py")], cwd=ROOT, creationflags=NO_WINDOW)
-        for _ in range(40):
-            if hud_running():
-                break
-            time.sleep(0.25)
+    ensure_hud_server()
     hwnd = find_hud_window()
     if hwnd:
         try:  # JARVIS is mid-answer: the HUD's own ears handle "stop", so don't barge in from here
@@ -268,9 +297,7 @@ class WakeWord:
             words = [w for w in res.get("result", []) if w.get("word") != "[unk]"]
             text = " ".join(w["word"] for w in words)
             conf = min((w.get("conf", 0) for w in words), default=0)
-            # Must be one whole wake phrase, heard confidently — not scraps of ordinary talk.
-            needed = 0.9 if " " not in text else 0.75  # single words need to be heard very clearly
-            if text in WAKE_SET and conf >= needed and not speak.is_speaking():
+            if is_wake(text, conf) and not speak.is_speaking():
                 debug(f'heard wake phrase: "{text}" (confidence {conf:.2f})')
                 threading.Thread(target=wake, args=("voice", text), daemon=True).start()
             elif text:
@@ -452,6 +479,8 @@ def main():
     stopper = StopWord(word.model)
     recorder = Recorder(claps)
     debug(f"listening (clap threshold {PEAK_MIN:.3f}, wake word {'on' if word.rec else 'off'})")
+    if not TEST:  # bring the HUD server up in the background now so JARVIS's brain is already warm when Dev calls
+        threading.Thread(target=ensure_hud_server, daemon=True).start()
     while True:  # reopen the mic if it disappears (sleep/resume, headset unplugged)
         try:
             with sd.InputStream(samplerate=RATE, channels=1, blocksize=BLOCK, dtype="float32") as stream:

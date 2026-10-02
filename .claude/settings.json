@@ -22,7 +22,8 @@
       "Edit(C:/Users/ADHIDEV/Desktop/jarvis/notes.md)",
       "Edit(C:/Users/ADHIDEV/Desktop/jarvis/news.md)",
       "Read(C:/Users/ADHIDEV/Desktop/jarvis/**)",
-      "Edit(C:/Users/ADHIDEV/Desktop/jarvis/tasks.md)"
+      "Edit(C:/Users/ADHIDEV/Desktop/jarvis/tasks.md)",
+      "Grep(C:/Users/ADHIDEV/Desktop/jarvis/memory/**)"
     ]
   }
 }
