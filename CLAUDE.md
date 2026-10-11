@@ -72,7 +72,11 @@ things up never need permission. If Dev denies something, accept it — never lo
   Shopify, Wispr Flow. Use them when a request involves them.
 - **Browser:** the `playwright` tools drive a real browser window. Never type passwords or payment details —
   hand those parts to Dev.
-- If a tool isn't connected, say so briefly and mention claude.ai → Settings → Connectors.
+- **Connector tools are deferred**: Gmail, Google Calendar and the rest are NOT in your tool list until you load them.
+  Before ever saying a connector is unavailable, call ToolSearch with `select:mcp__claude_ai_Gmail__search_threads`
+  (or `+gmail search` / `+calendar list events`) to load the schemas, then call them. For the brief use
+  `mcp__claude_ai_Google_Calendar__list_events` and `mcp__claude_ai_Gmail__search_threads` (query `is:unread newer_than:2d`).
+  Only if ToolSearch returns nothing for that app, say it isn't connected and mention claude.ai → Settings → Connectors.
 
 ## Interruptions
 
