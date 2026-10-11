@@ -375,7 +375,10 @@ class StopWord:
 
 # ---------- listening for commands: record Dev when the HUD asks, transcribe offline with Whisper ----------
 
-WHISPER_MODEL = env.get("WHISPER_MODEL") or "small.en"
+# base.en is ~3x faster than small.en on this laptop (25 s waits were common with small.en) and plenty accurate for
+# short commands. Set WHISPER_MODEL=small.en in .env for more accuracy; WHISPER_THREADS=0 lets the library choose.
+WHISPER_MODEL = env.get("WHISPER_MODEL") or "base.en"
+WHISPER_THREADS = int(env.get("WHISPER_THREADS") or 8)
 # Voice level that counts as "Dev is talking". The laptop mic's noise suppression gates silence to ~0.0001,
 # so a low floor is safe. Tune with VOICE_MIN in .env if JARVIS misses quiet speech (lower) or hears noise (higher).
 VOICE_MIN = float(env.get("VOICE_MIN") or 0.0035)
@@ -397,7 +400,7 @@ class Recorder:
         try:
             from faster_whisper import WhisperModel
             t = time.time()
-            self.model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=6)
+            self.model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8", cpu_threads=WHISPER_THREADS)
             self.model.transcribe(np.zeros(RATE, np.float32), language="en", beam_size=1)  # warm-up
             debug(f"whisper {WHISPER_MODEL} ready in {time.time() - t:.1f}s")
         except Exception as e:
@@ -453,6 +456,8 @@ class Recorder:
                 if self.model:
                     break
                 time.sleep(0.2)
+            if not self.model:  # load failed earlier (e.g. a transient Application Control block): try again once
+                self.load()
             t = time.time()
             segs, _ = self.model.transcribe(audio, language="en", beam_size=1, condition_on_previous_text=False,
                                             initial_prompt="Jarvis, Dev, Kochi, sweetheart, daddy's home.")
@@ -463,6 +468,33 @@ class Recorder:
         except Exception as e:
             speak.log(f"transcription failed: {e!r}")
         post("/heard", {"id": sid, "text": text})
+
+
+def refresh_audio():
+    """PortAudio caches the device list at start-up; after a Bluetooth headset or driver change every reopen fails
+    with -9999 until it is re-initialised."""
+    try:
+        sd._terminate()
+        sd._initialize()
+    except Exception as e:
+        speak.log(f"audio refresh failed: {e!r}")
+
+
+def pick_mic(failures):
+    """None = system default. After repeated failures, walk through the other real microphones (WASAPI/DirectSound
+    first) so a dead default device doesn't leave JARVIS deaf."""
+    if failures < 2:
+        return None
+    try:
+        bad = ("stereo mix", "sound mapper", "bthhfenum", "hands-free", "input ()", "primary sound")
+        hosts = {i: h["name"] for i, h in enumerate(sd.query_hostapis())}
+        found = [(0 if "WASAPI" in hosts[d["hostapi"]] else 1 if "DirectSound" in hosts[d["hostapi"]] else 2, i)
+                 for i, d in enumerate(sd.query_devices())
+                 if d["max_input_channels"] > 0 and not any(b in d["name"].lower() for b in bad)]
+        found.sort()
+        return found[(failures - 2) % len(found)][1] if found else None
+    except Exception:
+        return None
 
 
 def main():
@@ -481,9 +513,14 @@ def main():
     debug(f"listening (clap threshold {PEAK_MIN:.3f}, wake word {'on' if word.rec else 'off'})")
     if not TEST:  # bring the HUD server up in the background now so JARVIS's brain is already warm when Dev calls
         threading.Thread(target=ensure_hud_server, daemon=True).start()
-    while True:  # reopen the mic if it disappears (sleep/resume, headset unplugged)
+    failures, last_logged = 0, 0.0
+    while True:  # reopen the mic if it disappears (sleep/resume, headset or Bluetooth device change)
+        device = pick_mic(failures)
         try:
-            with sd.InputStream(samplerate=RATE, channels=1, blocksize=BLOCK, dtype="float32") as stream:
+            with sd.InputStream(samplerate=RATE, channels=1, blocksize=BLOCK, dtype="float32", device=device) as stream:
+                if failures:
+                    speak.log(f"listener mic recovered (device {device!r}) after {failures} failed attempts")
+                failures = 0
                 while True:
                     data, _ = stream.read(BLOCK)
                     block = data[:, 0]
@@ -495,8 +532,13 @@ def main():
         except KeyboardInterrupt:
             return
         except Exception as e:
-            speak.log(f"listener mic error: {e!r}; retrying")
-            time.sleep(3)
+            failures += 1
+            # Log the first failure and then at most once every 10 minutes, so speak.log doesn't balloon.
+            if failures == 1 or time.monotonic() - last_logged > 600:
+                last_logged = time.monotonic()
+                speak.log(f"listener mic error: {e!r}; retrying (attempt {failures})")
+            time.sleep(min(3 * failures, 15))
+            refresh_audio()
 
 
 if __name__ == "__main__":
