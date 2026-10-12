@@ -1,0 +1,11 @@
+.env
+memory/
+notes.md
+tasks.md
+*.pdf
+*.png
+*.jpg
+*.avif
+voice/
+wake/
+.git
