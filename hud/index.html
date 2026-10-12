@@ -716,6 +716,13 @@ window.visState = () => ({
 // =============== opened by the background listener ===============
 const qs = new URLSearchParams(location.search), w0 = qs.get("wake");
 if (w0) { history.replaceState(null, "", "/"); setTimeout(() => onWake(w0, qs.get("phrase") || ""), 400); }
+
+// =============== hosted preview (Vercel): no local brain behind this page ===============
+if (!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  caption("Web preview. The live assistant runs on Dev's laptop.");
+  $("sys").textContent = "WEB PREVIEW · OFFLINE";
+  setInterval(() => $("sys").textContent = "WEB PREVIEW · OFFLINE", 250);  // the status poll would otherwise overwrite it
+}
 </script>
 <script type="importmap">
 { "imports": {
